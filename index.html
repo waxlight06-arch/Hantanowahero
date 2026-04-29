@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    :root { --wiki-blue: #373a3c; --accent: #0275d8; --border: #ced4da; }
+    body { font-family: 'Noto Sans KR', sans-serif; background: #f4f7fa; margin: 0; padding: 15px; color: #333; line-height: 1.5; }
+
+    /* 에디터 레이아웃 */
+    .editor-wrapper { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; align-items: flex-start; }
+    .editor-left, .editor-right { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); flex: 1; min-width: 0; }
+    .input-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+    input, select, textarea { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
+    
+    /* 네모 박스 형태 색상 선택기 */
+    .color-picker-container { display: flex; gap: 10px; margin-bottom: 15px; background: #f1f3f5; padding: 12px; border-radius: 8px; }
+    .color-box { background: white; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; display: flex; align-items: center; gap: 10px; flex: 1; justify-content: space-between; }
+    .color-box label { font-size: 12px; font-weight: bold; color: #555; }
+    .color-box input[type="color"] { width: 35px; height: 35px; border: 1px solid #ddd; cursor: pointer; padding: 0; background: none; border-radius: 4px; }
+
+    .block-adder { background: #f1f3f5; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+    .block-list { border: 2px dashed #ccc; padding: 10px; min-height: 100px; border-radius: 8px; background: #fafafa; margin-bottom: 10px; }
+    
+    /* 리스트 카드 (클릭 수정) */
+    .item-card { background: white; border: 1px solid #ddd; padding: 10px; margin-bottom: 6px; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 12px; cursor: pointer; }
+    .item-card:hover { border-color: var(--accent); }
+    .item-card .txt-content { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: break-all; }
+    .item-card.editing { border: 2px solid var(--accent); background: #e7f1ff; }
+    
+    button { padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+    .btn-apply { background: var(--accent); color: white; width: 100%; margin-bottom: 8px; font-size: 15px; }
+
+    /* --- 출력용 위키 스타일 --- */
+    .wiki-container { width: 100%; max-width: 1000px; margin: 0 auto; background: white; word-break: break-all; padding: 10px; }
+    .wiki-top-row { display: flex; gap: 30px; margin-bottom: 25px; align-items: flex-start; justify-content: center; }
+    
+    /* 목차: 화면 왼쪽 벽에서 떨어진 디자인 */
+    .wiki-toc { border: 1px solid #ddd; background: #f9f9f9; padding: 15px; flex: 0 1 280px; box-sizing: border-box; }
+    .wiki-toc h4 { margin: 0 0 10px 0; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px; text-align: center; }
+    .wiki-toc ol { list-style: none; padding: 0; margin: 0; font-size: 13.5px; }
+    .wiki-toc li { margin-bottom: 5px; color: var(--accent); cursor: pointer; text-align: left; }
+    .wiki-toc .depth-1 { font-weight: bold; margin-top: 8px; }
+    .wiki-toc .depth-2 { padding-left: 15px; font-weight: normal; color: #555; }
+
+    /* 프로필 테이블 */
+    .wiki-profile { width: 320px; flex-shrink: 0; border-collapse: collapse; border: 2px solid #bbb; font-size: 12.5px; background: #fff; table-layout: fixed; }
+    .wiki-profile th, .wiki-profile td { border: 1px solid #bbb; padding: 8px; overflow-wrap: break-word; word-break: break-all; }
+    .profile-header { text-align: center; padding: 12px !important; }
+    .profile-header .name-kr { font-size: 18px; font-weight: bold; display: block; }
+    .profile-img img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+
+    /* 본문 설정 */
+    .wiki-content { width: 100%; font-size: 14px; clear: both; padding: 0 10px; box-sizing: border-box; }
+    .wiki-content h2 { border-bottom: 2px solid #373a3c; padding-bottom: 4px; margin: 35px 0 12px 0; font-size: 1.35rem; cursor: pointer; position: relative; }
+    .wiki-content h3 { border-bottom: 1px solid #eee; padding-bottom: 3px; margin: 25px 0 10px 0; font-size: 1.1rem; cursor: pointer; color: #444; position: relative; }
+    .wiki-content h2::after, .wiki-content h3::after { content: '▼'; position: absolute; right: 8px; font-size: 10px; color: #ccc; top: 55%; transform: translateY(-50%); }
+    .wiki-content p { margin: 15px 0; white-space: pre-wrap; line-height: 1.8; color: #333; }
+    .quote-box { background: #f8f9fa; border-left: 4px solid #adb5bd; padding: 15px; margin: 20px 0; font-style: italic; color: #555; }
+    .content-img { max-width: 100%; height: auto; margin: 20px 0; display: block; border-radius: 4px; }
+    .collapsed { display: none !important; }
+
+    @media (max-width: 768px) {
+        .wiki-top-row { flex-direction: column; align-items: center; gap: 20px; }
+        .wiki-profile { width: 100% !important; order: -1; }
+        .wiki-toc { width: 100% !important; flex: none; }
+    }
+</style>
+</head>
+<body>
+
+<div class="editor-wrapper">
+    <div class="editor-left">
+        <h2>1. 캐릭터 기본 정보</h2>
+        <div class="input-group">
+            <input id="kr" placeholder="이름 (한글)">
+            <input id="jp" placeholder="히라가나">
+            <input id="kanji" placeholder="한자">
+            <input id="en" placeholder="영문 이름">
+            <input id="img" placeholder="메인 이미지 URL" style="grid-column: span 2;">
+        </div>
+        
+        <div class="color-picker-container">
+            <div class="color-box"><label>배경 색상</label><input type="color" id="bgColor" value="#373a3c"></div>
+            <div class="color-box"><label>글자 색상</label><input type="color" id="textColor" value="#ffffff"></div>
+        </div>
+
+        <div id="tableFields"></div>
+        <button onclick="addField()" style="width:100%; background:#eee; color:#333; margin-bottom:10px;">+ 상세 정보 항목 추가</button>
+    </div>
+
+    <div class="editor-right">
+        <h2>2. 본문 구성 (클릭 수정 / 드래그 순서)</h2>
+        <div class="block-adder">
+            <div style="display:flex; gap:5px; margin-bottom:8px;">
+                <select id="blockType" style="flex:1">
+                    <option value="대제목">대제목</option>
+                    <option value="부제목">부제목</option>
+                    <option value="본문">일반 본문</option>
+                    <option value="대사">대사란</option>
+                    <option value="이미지">이미지 URL</option>
+                </select>
+                <button id="addBtn" onclick="addBlock()" style="background:var(--accent); color:white; flex:0.4;">추가/수정</button>
+            </div>
+            <textarea id="blockInput" placeholder="내용을 입력하세요. 리스트 항목 클릭 시 수정 가능."></textarea>
+            <input type="hidden" id="editIndex" value="-1">
+        </div>
+        <div id="blockList" class="block-list"></div>
+        <button class="btn-apply" onclick="generate()">미리보기 생성</button>
+        <div style="display:flex; gap:5px;">
+            <button onclick="exportToFile()" style="flex:1; background:#28a745; color:white;">파일로 저장</button>
+            <button onclick="document.getElementById('fileInput').click()" style="flex:1; background:#ffc107;">파일 불러오기</button>
+            <button onclick="copyCode()" style="flex:1.5; background:#6c757d; color:white;">최종 코드 복사</button>
+            <input type="file" id="fileInput" style="display:none" onchange="importFromFile(this)">
+        </div>
+    </div>
+</div>
+
+<div id="wiki-preview-area" style="margin-top:50px;"></div>
+
+<script>
+let fields = [{k:"출생", v:""}, {k:"신체", v:""}, {k:"성별", v:""}];
+let blocks = [];
+
+function addField() { fields.push({k:"", v:""}); renderFields(); }
+function renderFields() {
+    const container = document.getElementById("tableFields");
+    container.innerHTML = "";
+    fields.forEach((f, i) => {
+        container.innerHTML += `<div style="display:flex; gap:4px; margin-bottom:5px;">
+            <input style="flex:1" value="${f.k}" onchange="fields[${i}].k=this.value">
+            <input style="flex:2" value="${f.v}" onchange="fields[${i}].v=this.value">
+            <button onclick="fields.splice(${i},1);renderFields();" style="background:#ff7675; color:white; border:none; padding:0 10px;">×</button>
+        </div>`;
+    });
+}
+
+function addBlock() {
+    const type = document.getElementById("blockType").value;
+    const val = document.getElementById("blockInput").value;
+    const editIdx = parseInt(document.getElementById("editIndex").value);
+    if(!val) return;
+    if(editIdx > -1) { blocks[editIdx] = {t:type, v:val}; document.getElementById("editIndex").value = "-1"; document.getElementById("addBtn").innerText = "추가/수정"; }
+    else { blocks.push({t:type, v:val}); }
+    document.getElementById("blockInput").value = "";
+    renderBlocks();
+}
+
+function renderBlocks() {
+    const list = document.getElementById("blockList");
+    const editIdx = parseInt(document.getElementById("editIndex").value);
+    list.innerHTML = "";
+    blocks.forEach((b, i) => {
+        const item = document.createElement("div");
+        item.className = "item-card" + (i === editIdx ? " editing" : "");
+        item.draggable = true;
+        item.onclick = () => { document.getElementById("blockType").value=b.t; document.getElementById("blockInput").value=b.v; document.getElementById("editIndex").value=i; document.getElementById("addBtn").innerText="수정 반영"; renderBlocks(); };
+        item.innerHTML = `<span style="background:#6c757d; color:white; padding:2px 6px; border-radius:3px; font-size:10px; flex-shrink:0;">${b.t}</span>
+                          <span class="txt-content">${b.v}</span>
+                          <button onclick="event.stopPropagation();blocks.splice(${i},1);renderBlocks();" style="background:none; color:#dc3545; font-weight:bold;">삭제</button>`;
+        item.ondragstart = (e) => e.dataTransfer.setData("idx", i);
+        item.ondragover = (e) => e.preventDefault();
+        item.ondrop = (e) => { const from = e.dataTransfer.getData("idx"); const moved = blocks.splice(from, 1)[0]; blocks.splice(i, 0, moved); renderBlocks(); };
+        list.appendChild(item);
+    });
+}
+
+function generate() {
+    const info = { kr: document.getElementById("kr").value, jp: document.getElementById("jp").value, kanji: document.getElementById("kanji").value, en: document.getElementById("en").value, img: document.getElementById("img").value, bg: document.getElementById("bgColor").value, tx: document.getElementById("textColor").value };
+    let pHTML = `<tr><th colspan="2" style="background:${info.bg}; color:${info.tx};" class="profile-header"><span class="name-kr">${info.kr}</span><span style="font-size:10px; opacity:0.8; font-weight:normal;">${info.jp} | ${info.kanji} | ${info.en}</span></th></tr><tr><td colspan="2" class="profile-img"><img src="${info.img || 'https://via.placeholder.com/300x400'}"></td></tr>`;
+    fields.forEach(f => { if(f.k) pHTML += `<tr><th style="background:${info.bg}; color:${info.tx}; width:110px;">${f.k}</th><td>${f.v}</td></tr>`; });
+    let bodyHTML = ""; let tocHTML = ""; let h1Idx = 0; let h2Idx = 0;
+    blocks.forEach(b => {
+        if(b.t === "대제목") { h1Idx++; h2Idx = 0; bodyHTML += `<h2 id="idx-${h1Idx}" onclick="toggleWiki(this)">${h1Idx}. ${b.v}</h2>`; tocHTML += `<li class="depth-1" onclick="document.getElementById('idx-${h1Idx}').scrollIntoView({behavior:'smooth'})">${h1Idx}. ${b.v}</li>`; }
+        else if(b.t === "부제목") { h2Idx++; const subId = `idx-${h1Idx}-${h2Idx}`; bodyHTML += `<h3 id="${subId}" onclick="toggleWiki(this)">${h1Idx}.${h2Idx}. ${b.v}</h3>`; tocHTML += `<li class="depth-2" onclick="document.getElementById('${subId}').scrollIntoView({behavior:'smooth'})">${h1Idx}.${h2Idx}. ${b.v}</li>`; }
+        else if(b.t === "본문") { bodyHTML += `<p>${b.v}</p>`; }
+        else if(b.t === "이미지") { bodyHTML += `<img src="${b.v}" class="content-img">`; }
+        else if(b.t === "대사") { bodyHTML += `<div class="quote-box">${b.v}</div>`; }
+    });
+    document.getElementById("wiki-preview-area").innerHTML = `<div class="wiki-container"><div class="wiki-top-row"><div class="wiki-toc"><h4>목 차</h4><ol>${tocHTML}</ol></div><table class="wiki-profile">${pHTML}</table></div><div class="wiki-content">${bodyHTML}</div></div>`;
+}
+
+// 파일 저장 기능 (JSON 파일 다운로드)
+function exportToFile() {
+    const data = { main: { kr:document.getElementById("kr").value, jp:document.getElementById("jp").value, kanji:document.getElementById("kanji").value, en:document.getElementById("en").value, img:document.getElementById("img").value, bg:document.getElementById("bgColor").value, tx:document.getElementById("textColor").value }, fields, blocks };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `wiki_save_${document.getElementById("kr").value || 'data'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// 파일 불러오기 기능
+function importFromFile(input) {
+    const file = input.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const d = JSON.parse(e.target.result);
+        Object.keys(d.main).forEach(k => { if(document.getElementById(k)) document.getElementById(k).value = d.main[k]; });
+        fields = d.fields; blocks = d.blocks;
+        renderFields(); renderBlocks();
+        alert("파일을 성공적으로 불러왔습니다.");
+    };
+    reader.readAsText(file);
+}
+
+function copyCode() {
+    const code = document.getElementById("wiki-preview-area").innerHTML;
+    if(!code) return alert("미리보기를 먼저 생성하세요.");
+    const style = document.querySelector('style').outerHTML;
+    const script = `<script>function toggleWiki(el){let next=el.nextElementSibling;const tag=el.tagName;while(next&&next.tagName!=='H2'&&(tag==='H3'?next.tagName!=='H3':true)){next.classList.toggle('collapsed');next=next.nextElementSibling;}}<\/script>`;
+    navigator.clipboard.writeText(style + code + script).then(() => alert("코드가 복사되었습니다!"));
+}
+
+renderFields();
+</script>
+</body>
+</html>
